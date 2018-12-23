@@ -1,0 +1,25 @@
+{
+  "name": "json-conf-m",
+  "version": "0.1.0",
+  "description": "",
+  "main": "lib/index.js",
+  "types": "lib/index.d.ts",
+  "scripts": {
+    "build": "tsc"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/GeminiLab/json-conf-m.git"
+  },
+  "author": "Benjamin P.M. Lovegood",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/GeminiLab/json-conf-m/issues"
+  },
+  "homepage": "https://github.com/GeminiLab/json-conf-m#readme",
+  "dependencies": {},
+  "devDependencies": {
+    "@types/node": "^10.12.18",
+    "typescript": "^3.2.2"
+  }
+}
