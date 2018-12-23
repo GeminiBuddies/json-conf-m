@@ -43,6 +43,7 @@ export abstract class Config {
         return value;
     }
 
+    // todo: allow add new nodes
     public set(path: string, value: number | string | boolean | object | null | undefined): void {
         var [ finalKey, location, , , ] = this._processPathAndLocate(path);
 
