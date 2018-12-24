@@ -1,33 +1,54 @@
+const fs = require("fs");
 const confjs = require("./lib/index");
+
+const defaultConf = {
+    a: {
+        x: 1,
+        y: "y-string"
+    },
+    b: 2
+}
+
+fs.writeFileSync("test.json", JSON.stringify(defaultConf));
 
 var conf = confjs.Config.FromFile("test.json");
 
+// basic test
+console.log("%basic tests");
 console.log(conf.get("a.x"));
-console.log(conf.get("a.y"));
-console.log(conf.get("a.y.m"));
+console.log(conf.get("b"));
 
-conf.set("a.y.n", undefined);
-conf.set("a.y.m", 3);
-conf.set("a.y.o", "a.y.o");
+console.log(conf.get("a.z"));
 
-console.log(conf.get("a.x"));
-console.log(conf.get("a.y"));
-console.log(conf.get("a.y.m"));
-
-var y = conf.subconfig("a.y");
-
-console.log(y.get("m"));
-y.set("m", 4)
+conf.set("a.y", "y-updated");
+conf.set("a.z", { m: 42, n: "this-is-a.z.n" });
 
 console.log(conf.get("a.y"));
+console.log(conf.get("a.z.n"));
 
-var z = conf.subconfig("a.z");
-console.log(z);
-z = conf.subconfig("a.z", { continueAnyway : true });
-console.log(z);
+conf.set("b.x.y.z.w", "ichi");
 
-z.set("haha", "hoho");
+console.log(conf.get("b.x"));
 
-console.log(conf.get("a"));
-conf.delete("a.z");
-console.log(conf.get("a"));
+// subconfig test
+var confb = conf.subconfig("b");
+
+console.log(confb.get("x.y.z.w"));
+
+confb.set("x.y.z.z", "ni");
+confb.set("x.y.z.y", "san");
+
+console.log(conf.get("b.x.y.z"));
+
+var confbxy = confb.subconfig("x.y");
+
+console.log(confbxy.get("z.z"));
+
+confbxy.set("y.y", "shi")
+confbxy.set("y.x", "go")
+confbxy.set("y.w", "roku")
+
+console.log(confb.get("x"));
+
+console.log("%save");
+conf.save();

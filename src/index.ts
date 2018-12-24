@@ -19,40 +19,43 @@ export abstract class Config {
     public abstract save(): void;
     public abstract reload(): void;
 
+    public toString(): string { return this.source; }
+
     // [ finalKey, parent, exists, value, isLeaf ]
-    protected _processPathAndLocate(path: string): [ string, any, boolean, any, boolean ] {
+    protected _locateAndReadWithPath(path: string, create: boolean): { finalKey: string, location: any, exists: boolean, value: any, isLeaf: boolean } {
         var keys = this._pathProcesser(path);
         var finalKey = keys[keys.length - 1];
-        var location = this._locate(keys.slice(0, -1));
-        var exists = location !== undefined && finalKey in location;
+        var keys = keys.slice(0, -1);
+
+        var location: any = create ? this._locateOrCreate(keys).result : this._locate(keys);
+
+        if (location == undefined) {
+            return { finalKey: finalKey, location: location, exists: false, value: undefined, isLeaf: false };
+        }
+
+        var exists = finalKey in location;
         var value = exists ? location[finalKey] : undefined;
         var isLeaf = exists ? !(typeof value === "object") : false;
 
-        return [ finalKey, location, exists, value, isLeaf ];
+        return { finalKey: finalKey, location: location, exists: exists, value: value, isLeaf: isLeaf };
     }
 
     public exists(path: string): boolean {
-        var [ , , exists, , ] = this._processPathAndLocate(path);
-
-        return exists;
+        return this._locateAndReadWithPath(path, false).exists;
     }
 
     public get(path: string): any {
-        var [ , , , value, ] = this._processPathAndLocate(path);
-
-        return value;
+        return this._locateAndReadWithPath(path, false).value;
     }
 
     // todo: allow add new nodes
     public set(path: string, value: number | string | boolean | object | null | undefined): void {
-        var [ finalKey, location, , , ] = this._processPathAndLocate(path);
-
-        if (location === undefined) return;
+        var loc = this._locateAndReadWithPath(path, true);
 
         if (value === undefined) {
-            if (finalKey in location) delete location[finalKey];
+            if (loc.finalKey in loc.location) delete loc.location[loc.finalKey];
         } else {
-            location[finalKey] = value;
+            loc.location[loc.finalKey] = value;
         }
     }
 
@@ -60,35 +63,48 @@ export abstract class Config {
         this.set(path, undefined);
     }
 
-    public subconfig(path: string, config? : { continueAnyway?: boolean }): Config | undefined {
+    public subconfig(path: string, config? : { createIfNotExists?: boolean }): Config | undefined {
         config = config || {};
-        var continueAnyway = config.continueAnyway || false;
-        var keys = this._pathProcesser(path);
+        var createIfNotExists = config.createIfNotExists || false;
 
-        var [ finalKey, location, exists, , isLeaf ] = this._processPathAndLocate(path);
-
-        if ((!exists || isLeaf)) {
-            if (continueAnyway) {
-                if (location === undefined) location = this._locateOrCreate(keys);
-                
-                location[finalKey] = {};
-            } else {
-                return undefined;
-            }
+        if (this._locateAndReadWithPath(path, createIfNotExists).location === undefined) {
+            return undefined;
         }
 
         return new Subconfig(this, path, this._separator);
     }
 
     public abstract all(value: object): void;
+    public abstract getAll(): object;
  
     // handle [] correctly!
-    public locate(path: string[]): any { return this._locate(path); }
-    protected abstract _locate(path: string[]): any;
-    public locateOrCreate(path: string[]): any { return this._locateOrCreate(path); }
-    protected abstract _locateOrCreate(path: string[]): any;
+    public locate(path: string[]): object | undefined { return this._locate(path); }
+    protected abstract _locate(path: string[]): object | undefined;
+    public locateOrCreate(path: string[]): { result: object | undefined, created: boolean } { return this._locateOrCreate(path); }
+    protected abstract _locateOrCreate(path: string[]): { result: object | undefined, created: boolean };
+
     protected _pathProcesser(path: string): string[] {
         return path.split(this._separator);
+    }
+
+    protected static _locateOrCreateFromGivenRoot(root: object, path: string[], create: boolean): { result: object | undefined, created: boolean } {
+        let ptr: any = root; // as ts have problem indexing objects...
+        var len = path.length;
+        var created = false;
+
+        for (var i = 0; i < len; ++i) {
+            var key = path[i];
+
+            if (!(key in ptr && typeof ptr[key] === "object")) {
+                if (!create) return { result: undefined, created: false };
+
+                ptr[key] = {};
+                created = true;
+            }
+            ptr = ptr[key];
+        }
+
+        return { result: ptr as object, created : created };
     }
 
     public static FromFile(path: string, config? : { splitter? : string }): Config {
@@ -123,31 +139,17 @@ abstract class RootConfig extends Config {
         this._root = value;
     }
 
-    protected _locate(path: string[]): any {
-        let ptr: any = this._root;
-        var len = path.length;
-
-        for (var i = 0; i < len; ++i) {
-            var key = path[i];
-
-            if (!(key in ptr && typeof (ptr = ptr[key]) === "object")) return undefined;
-        }
-
-        return ptr;
+    public getAll(): object {
+        return this._root;
     }
 
-    protected _locateOrCreate(path: string[]): void {
-        let ptr: any = this._root;
-        var len = path.length;
+    protected _locate(path: string[]): any {
+        var res = Config._locateOrCreateFromGivenRoot(this._root, path, false);
+        return res.result;
+    }
 
-        for (var i = 0; i < len; ++i) {
-            var key = path[i];
-
-            if (!(key in ptr && typeof ptr[key] === "object")) ptr[key] = {};
-            ptr = ptr[key];
-        }
-
-        return ptr;
+    protected _locateOrCreate(path: string[]): { result: any, created: boolean } {
+        return Config._locateOrCreateFromGivenRoot(this._root, path, true);
     }
 }
 
@@ -226,38 +228,23 @@ class Subconfig extends Config {
         this._parent.set(this._pathToParent, value);
     }
 
-    protected _locate(path: string[]): any {
-        var selfRoot = this._parent.locate(this._keysToParent);
-
-        if (selfRoot === undefined) return undefined;
-
-        var ptr = selfRoot;
-        var len = path.length;
-
-        for (var i = 0; i < len; ++i) {
-            var key = path[i];
-
-            if (!(key in ptr && typeof (ptr = ptr[key]) === "object")) return undefined;
-        }
-
-        return ptr;
+    public getAll(): object {
+        return this.getSelfRoot(false) as object;
     }
 
-    protected _locateOrCreate(path: string[]): any {
-        var selfRoot = this._parent.locateOrCreate(this._keysToParent);
-
-        if (selfRoot === undefined) return undefined;
-
-        var ptr = selfRoot;
-        var len = path.length;
-
-        for (var i = 0; i < len; ++i) {
-            var key = path[i];
-
-            if (!(key in ptr && typeof ptr[key] === "object")) ptr[key] = {};
-            ptr = ptr[key];
+    private getSelfRoot(create: boolean): any {
+        if (create) {
+            return this._parent.locateOrCreate(this._keysToParent).result;
+        } else {
+            return this._parent.locate(this._keysToParent);
         }
+    }
 
-        return ptr;
+    protected _locate(path: string[]): any {
+        return Config._locateOrCreateFromGivenRoot(this.getSelfRoot(false), path, false).result;
+    }
+
+    protected _locateOrCreate(path: string[]): { result: any, created: boolean } {
+        return Config._locateOrCreateFromGivenRoot(this.getSelfRoot(true), path, true);
     }
 }
