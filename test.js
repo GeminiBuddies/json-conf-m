@@ -51,4 +51,4 @@ confbxy.set("y.w", "roku")
 console.log(confb.get("x"));
 
 console.log("%save");
-conf.save();
+conf.save(true);

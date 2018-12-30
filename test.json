@@ -1,1 +1,26 @@
-{"a":{"x":1,"y":"y-updated","z":{"m":42,"n":"this-is-a.z.n"}},"b":{"x":{"y":{"z":{"w":"ichi","z":"ni","y":"san"},"y":{"y":"shi","x":"go","w":"roku"}}}}}
+{
+    "a": {
+        "x": 1,
+        "y": "y-updated",
+        "z": {
+            "m": 42,
+            "n": "this-is-a.z.n"
+        }
+    },
+    "b": {
+        "x": {
+            "y": {
+                "z": {
+                    "w": "ichi",
+                    "z": "ni",
+                    "y": "san"
+                },
+                "y": {
+                    "y": "shi",
+                    "x": "go",
+                    "w": "roku"
+                }
+            }
+        }
+    }
+}

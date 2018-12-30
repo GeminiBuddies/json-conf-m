@@ -1,7 +1,7 @@
 import * as fs from 'fs';
 
-function JSONStringifyASCIISafe(obj: object): string {
-    return JSON.stringify(obj).replace(/[\u007F-\uFFFF]/g, function(chr) {
+function JSONStringifyASCIISafe(obj: object, expand?: boolean): string {
+    return JSON.stringify(obj, undefined, expand ? 4 : undefined).replace(/[\u007F-\uFFFF]/g, function(chr) {
         return "\\u" + ("0000" + chr.charCodeAt(0).toString(16)).substr(-4);
     });
 }
@@ -16,7 +16,7 @@ export abstract class Config {
     }
 
     public abstract get source(): string;
-    public abstract save(): void;
+    public abstract save(expand?: boolean): void;
     public abstract reload(): void;
 
     public toString(): string { return this.source; }
@@ -44,8 +44,8 @@ export abstract class Config {
         return this._locateAndReadWithPath(path, false).exists;
     }
 
-    public get(path: string): any {
-        return this._locateAndReadWithPath(path, false).value;
+    public get(path: string, defaultValue?: any): any {
+        return this._locateAndReadWithPath(path, false).value || defaultValue;
     }
 
     // todo: allow add new nodes
@@ -132,7 +132,7 @@ abstract class RootConfig extends Config {
 
     public abstract get source(): string;
     
-    public abstract save(): void;
+    public abstract save(expand?: boolean): void;
     public abstract reload(): void;
 
     public all(value: object): void {
@@ -169,12 +169,12 @@ class FileConfig extends RootConfig {
         this._root = JSON.parse(fs.readFileSync(this._src).toString());
     }
 
-    private _writeToSrc(): void {
-        fs.writeFileSync(this._src, JSONStringifyASCIISafe(this._root || {}));
+    private _writeToSrc(expand?: boolean): void {
+        fs.writeFileSync(this._src, JSONStringifyASCIISafe(this._root || {}, expand));
     }
 
-    public save(): void {
-        this._writeToSrc();
+    public save(expand?: boolean): void {
+        this._writeToSrc(expand);
     }
 
     public reload(): void {
@@ -191,7 +191,7 @@ class ObjectConfig extends RootConfig {
         return `<object>`;
     }
 
-    public save(): void { }
+    public save(expand?: boolean): void { }
     public reload(): void { }
 
     public all(value: object): void {
@@ -216,8 +216,8 @@ class Subconfig extends Config {
         return `<path \"${this._pathToParent}\"from parent ${this._parent.source}>`;
     }
 
-    public save(): void {
-        this._parent.save();
+    public save(expand?: boolean): void {
+        this._parent.save(expand);
     }
 
     public reload(): void {
