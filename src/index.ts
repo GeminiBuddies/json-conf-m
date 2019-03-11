@@ -63,6 +63,7 @@ export abstract class Config {
         this.set(path, undefined);
     }
 
+    public subconfig(path: string, config : { createIfNotExists : true }): Config;
     public subconfig(path: string, config? : { createIfNotExists?: boolean }): Config | undefined {
         config = config || {};
         var createIfNotExists = config.createIfNotExists || false;
